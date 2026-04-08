@@ -1,21 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import {
   getInitialLogicalTheme,
   logicalToDaisyTheme,
   THEME_STORAGE_KEY,
-  type LogicalTheme,
 } from '../theme/theme';
 import { useConfig } from '../hooks/useConfig';
-import LanguageSwitcher from './LanguageSwitcher';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 
 export default function Navbar() {
-  const [mode, setMode] = useState<LogicalTheme>(getInitialLogicalTheme);
-  const { DISABLE_UPLOAD, READ_ONLY, NO_LANGUAGE_SWITCHER } = useConfig();
+  const { DISABLE_UPLOAD, READ_ONLY } = useConfig();
   const { t } = useTranslation();
   const location = useLocation();
   useEffect(() => {
+    const mode = getInitialLogicalTheme();
     const daisy = logicalToDaisyTheme(mode);
     document.documentElement.setAttribute('data-theme', daisy);
     try {
@@ -23,11 +21,7 @@ export default function Navbar() {
     } catch {
       void 0;
     }
-  }, [mode]);
-
-  function toggleTheme() {
-    setMode(mode === 'dark' ? 'light' : 'dark');
-  }
+  }, []);
 
   return (
     <nav className="sticky top-0 z-50 bg-base-100/80 backdrop-blur-lg border-b border-base-300">
