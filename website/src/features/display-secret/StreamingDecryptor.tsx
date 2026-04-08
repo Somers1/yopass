@@ -48,7 +48,8 @@ export default function StreamingDecryptor({
 
       const serverFilename = response.headers.get('X-Yopass-Filename');
       if (serverFilename) {
-        setFilename(serverFilename);
+        try { setFilename(decodeURIComponent(serverFilename)); }
+        catch { setFilename(serverFilename); }
       }
 
       const contentLength = response.headers.get('Content-Length');

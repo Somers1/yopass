@@ -9,7 +9,7 @@ services:
 
   yopass:
     build:
-      context: ../../..
+      context: ./
       dockerfile: Dockerfile
     restart: always
     ports:

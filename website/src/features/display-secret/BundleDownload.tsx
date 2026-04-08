@@ -30,7 +30,8 @@ async function fetchAndDecryptFile(
     throw new Error('Failed to fetch file');
   }
 
-  const serverFilename = response.headers.get('X-Yopass-Filename');
+  const rawFilename = response.headers.get('X-Yopass-Filename');
+  const serverFilename = rawFilename ? (() => { try { return decodeURIComponent(rawFilename); } catch { return rawFilename; } })() : null;
 
   if (!response.body) {
     throw new Error('No response body');
