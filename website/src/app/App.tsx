@@ -13,14 +13,14 @@ export default function App() {
     useConfig();
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-base-200 flex flex-col overflow-x-hidden">
+    <div className="min-h-screen flex flex-col overflow-x-hidden" style={{ background: 'radial-gradient(ellipse, #f5f3f0 50%, #ececec 100%)' }}>
       <HashRouter>
         <Navbar />
 
         {/* Main Content */}
         <div className="w-full max-w-3xl mx-auto mb-auto px-4 py-12 sm:py-16">
           <div className="card bg-base-100 shadow-sm border border-base-300">
-            <div className="card-body p-6 sm:p-10">
+            <div className="card-body p-6">
               <Routes>
                 <Route
                   path="/"
@@ -45,48 +45,32 @@ export default function App() {
         </div>
       </HashRouter>
       {/* Footer */}
-      <footer className="bg-base-100/50 border-t border-base-300">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col items-center text-center space-y-4">
-            <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-              {PRIVACY_NOTICE_URL && PRIVACY_NOTICE_URL.trim() && (
-                <>
-                  <a
-                    href={PRIVACY_NOTICE_URL}
-                    className="text-base-content/70 hover:text-primary transition-colors duration-200 underline decoration-dotted underline-offset-4 hover:decoration-solid"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {t('footer.privacyNotice')}
-                  </a>
-                  <span className="text-base-content/40">•</span>
-                </>
-              )}
-              {IMPRINT_URL && IMPRINT_URL.trim() && (
-                <>
-                  <a
-                    href={IMPRINT_URL}
-                    className="text-base-content/70 hover:text-primary transition-colors duration-200 underline decoration-dotted underline-offset-4 hover:decoration-solid"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {t('footer.imprint')}
-                  </a>
-                  <span className="text-base-content/40">•</span>
-                </>
-              )}
-              <span className="text-base-content/70">
-                {t('footer.createdBy')}{' '}
-                <a
-                  href="https://github.com/jhaals"
-                  className="text-primary hover:text-primary-focus font-medium transition-colors duration-200 underline decoration-dotted underline-offset-4 hover:decoration-solid"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Johan Haals
+      <footer className="border-base-300">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-base-content/40">
+            {PRIVACY_NOTICE_URL && PRIVACY_NOTICE_URL.trim() && (
+              <>
+                <a href={PRIVACY_NOTICE_URL} className="hover:text-base-content/60 transition-colors" target="_blank" rel="noopener noreferrer">
+                  {t('footer.privacyNotice')}
                 </a>
-              </span>
-            </div>
+                <span>•</span>
+              </>
+            )}
+            {IMPRINT_URL && IMPRINT_URL.trim() && (
+              <>
+                <a href={IMPRINT_URL} className="hover:text-base-content/60 transition-colors" target="_blank" rel="noopener noreferrer">
+                  {t('footer.imprint')}
+                </a>
+                <span>•</span>
+              </>
+            )}
+            <span>
+              Forked from open source{' '}
+              <a href="https://github.com/jhaals/yopass" className="hover:text-base-content/60 transition-colors" target="_blank" rel="noopener noreferrer">
+                Yopass
+              </a>
+              {' '}by Johan Haals
+            </span>
           </div>
         </div>
       </footer>

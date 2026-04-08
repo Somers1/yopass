@@ -4,3 +4,9 @@
     emerald --default,
     dim;
 }
+[data-theme="emerald"] {
+  --color-primary: oklch(0.37 0.01 260);
+  --color-primary-content: oklch(0.98 0 0);
+  --color-success: oklch(0.45 0.01 260);
+  --color-success-content: oklch(0.98 0 0);
+}

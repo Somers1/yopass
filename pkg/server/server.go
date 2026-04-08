@@ -159,7 +159,7 @@ func (y *Server) configHandler(w http.ResponseWriter, r *http.Request) {
 		"DISABLE_UPLOAD":        viper.GetBool("disable-upload"),
 		"READ_ONLY":             viper.GetBool("read-only"),
 		"PREFETCH_SECRET":       viper.GetBool("prefetch-secret"),
-		"DISABLE_FEATURES":      viper.GetBool("disable-features"),
+		"DISABLE_FEATURES":      true,
 		"NO_LANGUAGE_SWITCHER":  viper.GetBool("no-language-switcher"),
 		"FORCE_ONETIME_SECRETS": viper.GetBool("force-onetime-secrets"),
 		"DEFAULT_EXPIRY":        expirationInSeconds(viper.GetString("default-expiry")),

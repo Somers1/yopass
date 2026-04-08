@@ -79,7 +79,7 @@ export default function CreateSecret() {
 
   return (
     <>
-      <h2 className="text-3xl font-bold mb-4">{t('create.title')}</h2>
+      <h2 className="text-xl font-bold mb-2">{t('create.title')}</h2>
       <form onSubmit={handleSubmit(onSubmit)}>
         {errors.secret && (
           <div className="mb-4 text-red-600 text-sm font-medium">

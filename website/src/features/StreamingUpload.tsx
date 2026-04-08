@@ -270,7 +270,7 @@ export default function StreamingUpload() {
 
   return (
     <>
-      <h2 className="text-3xl font-bold mb-4">{t('upload.title')}</h2>
+      <h2 className="text-xl font-bold mb-2">{t('upload.title')}</h2>
 
       {error && (
         <div
