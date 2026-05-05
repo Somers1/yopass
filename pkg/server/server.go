@@ -299,6 +299,7 @@ func (y *Server) HTTPHandler() http.Handler {
 		mx.HandleFunc("/file/"+keyParameter, y.deleteStreamSecret).Methods(http.MethodDelete)
 		mx.HandleFunc("/bundle/"+keyParameter, y.getBundle).Methods(http.MethodGet)
 		mx.HandleFunc("/bundle/"+keyParameter, y.deleteBundle).Methods(http.MethodDelete)
+		mx.HandleFunc("/bundle/"+keyParameter+"/status", y.getBundleStatus).Methods(http.MethodGet)
 		mx.HandleFunc("/bundle/"+keyParameter, y.optionsSecret).Methods(http.MethodOptions)
 		if viper.GetBool("prefetch-secret") {
 			mx.HandleFunc("/file/"+keyParameter+"/status", y.getStreamSecretStatus).Methods(http.MethodGet)

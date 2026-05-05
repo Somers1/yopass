@@ -44,6 +44,10 @@ export interface BundleManifest {
   expiration: number;
 }
 
+export type StatusResponse = {
+  oneTime: boolean;
+};
+
 export async function createBundle(
   fileKeys: string[],
   filenames: string[],

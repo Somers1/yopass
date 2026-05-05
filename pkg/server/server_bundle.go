@@ -12,7 +12,6 @@ import (
 
 const bundleKeyPrefix = "bundle:"
 
-// createBundleRequest is the JSON body for POST /create/bundle.
 type createBundleRequest struct {
 	FileKeys   []string `json:"file_keys"`
 	Filenames  []string `json:"filenames"`
@@ -21,7 +20,6 @@ type createBundleRequest struct {
 	OneTime    bool     `json:"one_time"`
 }
 
-// createBundle handles POST /create/bundle.
 func (y *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 	var req createBundleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -50,7 +48,6 @@ func (y *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate that all referenced files exist in the database
 	for _, fk := range req.FileKeys {
 		if _, err := y.DB.Get(streamKeyPrefix + fk); err != nil {
 			y.Logger.Debug("Bundle references non-existent file", zap.String("key", fk), zap.Error(err))
@@ -59,7 +56,6 @@ func (y *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build the bundle
 	bundle := yopass.Bundle{
 		Expiration: req.Expiration,
 		OneTime:    req.OneTime,
@@ -72,7 +68,6 @@ func (y *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Serialize and store as a Secret (the Message field holds the JSON manifest)
 	manifest, err := json.Marshal(bundle)
 	if err != nil {
 		y.Logger.Error("Failed to marshal bundle", zap.Error(err))
@@ -108,7 +103,6 @@ func (y *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getBundle handles GET /bundle/{key}.
 func (y *Server) getBundle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, no-cache")
 	w.Header().Set("Content-Type", "application/json")
@@ -122,8 +116,6 @@ func (y *Server) getBundle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The Message field holds the JSON-serialized bundle manifest.
-	// Return it directly.
 	var bundle yopass.Bundle
 	if err := json.Unmarshal([]byte(secret.Message), &bundle); err != nil {
 		y.Logger.Error("Failed to decode bundle manifest", zap.Error(err))
@@ -131,7 +123,6 @@ func (y *Server) getBundle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build the response
 	type bundleResponse struct {
 		Files      []yopass.BundleFile `json:"files"`
 		OneTime    bool                `json:"one_time"`
@@ -145,15 +136,31 @@ func (y *Server) getBundle(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		y.Logger.Error("Failed to write bundle response", zap.Error(err))
+		return
 	}
 
-	// If one-time, delete the bundle and all referenced files
 	if bundle.OneTime {
-		y.deleteBundleAndFiles(key, bundle)
+		y.deleteBundleManifest(key)
 	}
 }
 
-// deleteBundle handles DELETE /bundle/{key}.
+func (y *Server) getBundleStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "private, no-cache")
+	w.Header().Set("Content-Type", "application/json")
+
+	key := mux.Vars(r)["key"]
+	oneTime, err := y.DB.Status(bundleKeyPrefix + key)
+	if err != nil {
+		y.Logger.Debug("Bundle not found", zap.Error(err))
+		http.Error(w, `{"message": "Bundle not found"}`, http.StatusNotFound)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(map[string]bool{"oneTime": oneTime}); err != nil {
+		y.Logger.Error("Failed to write bundle status response", zap.Error(err))
+	}
+}
+
 func (y *Server) deleteBundle(w http.ResponseWriter, r *http.Request) {
 	key := mux.Vars(r)["key"]
 
@@ -174,22 +181,22 @@ func (y *Server) deleteBundle(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// deleteBundleAndFiles removes a bundle manifest and all its referenced files.
 func (y *Server) deleteBundleAndFiles(key string, bundle yopass.Bundle) {
 	ctx := context.Background()
 	for _, f := range bundle.Files {
-		// Delete file data from file store
 		if err := y.FileStore.Delete(ctx, f.Key); err != nil {
 			y.Logger.Error("Failed to delete bundle file from store",
 				zap.String("bundle", key), zap.String("file", f.Key), zap.Error(err))
 		}
-		// Delete file metadata from database
 		if _, err := y.DB.Delete(streamKeyPrefix + f.Key); err != nil {
 			y.Logger.Error("Failed to delete bundle file metadata",
 				zap.String("bundle", key), zap.String("file", f.Key), zap.Error(err))
 		}
 	}
-	// Delete the bundle manifest itself
+	y.deleteBundleManifest(key)
+}
+
+func (y *Server) deleteBundleManifest(key string) {
 	if _, err := y.DB.Delete(bundleKeyPrefix + key); err != nil {
 		y.Logger.Error("Failed to delete bundle manifest",
 			zap.String("bundle", key), zap.Error(err))

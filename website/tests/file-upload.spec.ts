@@ -393,8 +393,7 @@ test.describe('File Upload', () => {
     }
   });
 
-  test('should replace file when new file is selected', async ({ page }) => {
-    // Upload first file
+  test('should add files when new file is selected', async ({ page }) => {
     const fileContent1 = testFiles.textFile.content;
     await page.setInputFiles('input[type="file"]', {
       name: testFiles.textFile.name,
@@ -404,7 +403,6 @@ test.describe('File Upload', () => {
 
     await expect(page.locator(`text=${testFiles.textFile.name}`)).toBeVisible();
 
-    // Upload second file (should replace first)
     const fileContent2 = testFiles.jsonFile.content;
     await page.setInputFiles('input[type="file"]', {
       name: testFiles.jsonFile.name,
@@ -412,12 +410,9 @@ test.describe('File Upload', () => {
       buffer: Buffer.from(fileContent2),
     });
 
-    // Should show second file name
     await expect(page.locator(`text=${testFiles.jsonFile.name}`)).toBeVisible();
-    // Should not show first file name
-    await expect(
-      page.locator(`text=${testFiles.textFile.name}`),
-    ).not.toBeVisible();
+    await expect(page.locator(`text=${testFiles.textFile.name}`)).toBeVisible();
+    await expect(page.locator('text=2 file(s) selected')).toBeVisible();
   });
 
   test('should handle large files gracefully', async ({ page }) => {
@@ -543,5 +538,38 @@ test.describe('File Upload', () => {
       expiration: 3600,
       contentType: 'application/octet-stream',
     });
+  });
+
+  test('should generate bundle URL for multi-file upload', async ({ page }) => {
+    const bundleId = 'bundle-id-12345';
+    await mockAPI.mockUploadFile(mockResponses.fileUploaded);
+    await mockAPI.mockCreateBundle({ message: bundleId });
+
+    await page.setInputFiles('input[type="file"]', [
+      {
+        name: testFiles.textFile.name,
+        mimeType: testFiles.textFile.type,
+        buffer: Buffer.from(testFiles.textFile.content),
+      },
+      {
+        name: testFiles.jsonFile.name,
+        mimeType: testFiles.jsonFile.type,
+        buffer: Buffer.from(testFiles.jsonFile.content),
+      },
+    ]);
+
+    await page.click('button[type="submit"]');
+
+    await expect(
+      page.locator('h2:has-text("Secret stored securely")'),
+    ).toBeVisible();
+
+    const bundleRequest = mockAPI.getLastRequest('/create/bundle');
+    expect(bundleRequest).toBeDefined();
+
+    const linkCode = page.locator('code').first();
+    await expect(linkCode).toBeVisible();
+    const url = await linkCode.textContent();
+    expect(url).toContain(`/b/${bundleId}/`);
   });
 });

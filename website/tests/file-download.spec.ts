@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { MockAPI } from './helpers/mock-api';
 import { testFiles } from './helpers/test-data';
 import { encrypt, createMessage } from 'openpgp';
+import JSZip from 'jszip';
+import fs from 'fs/promises';
 
 /**
  * Helper: encrypt content as binary OpenPGP (matching what the streaming
@@ -57,6 +59,33 @@ async function mockStreamingFile(
       body: encryptedBuffer,
     });
   });
+}
+
+async function mockBundle(
+  page: import('@playwright/test').Page,
+  bundleId: string,
+  oneTime: boolean,
+  files: Array<{ key: string; filename: string; size: number }>,
+) {
+  let manifestFetches = 0;
+  await page.route(`**/bundle/${bundleId}/status`, async route => {
+    await route.fulfill({
+      status: 200,
+      json: { oneTime },
+    });
+  });
+  await page.route(`**/bundle/${bundleId}`, async route => {
+    manifestFetches += 1;
+    await route.fulfill({
+      status: 200,
+      json: { files, one_time: oneTime, expiration: 3600 },
+    });
+  });
+  return {
+    get manifestFetches() {
+      return manifestFetches;
+    },
+  };
 }
 
 test.describe('File Download', () => {
@@ -361,6 +390,73 @@ test.describe('File Download', () => {
     await expect(page.locator('h2:has-text("File Downloaded")')).toBeVisible({
       timeout: 10000,
     });
+  });
+
+  test('should reveal one-time bundle before fetching manifest and download all files as zip', async ({
+    page,
+  }) => {
+    const bundleId = 'test-bundle-download-123';
+    const password = 'test-bundle-password-123';
+    const files = [
+      {
+        key: 'bundle-file-one',
+        filename: 'first.txt',
+        content: 'First bundle file',
+      },
+      {
+        key: 'bundle-file-two',
+        filename: 'second.txt',
+        content: 'Second bundle file',
+      },
+    ];
+    const bundle = await mockBundle(
+      page,
+      bundleId,
+      true,
+      files.map(file => ({
+        key: file.key,
+        filename: file.filename,
+        size: Buffer.byteLength(file.content),
+      })),
+    );
+
+    for (const file of files) {
+      const encryptedBuffer = await encryptBinary(
+        new Uint8Array(Buffer.from(file.content)),
+        file.filename,
+        password,
+      );
+      await mockStreamingFile(page, file.key, encryptedBuffer, file.filename);
+    }
+
+    await page.goto(`/#/b/${bundleId}/${password}`);
+
+    await expect(page.locator('h2:has-text("Secure Message")')).toBeVisible();
+    await expect(
+      page.locator('button:has-text("Reveal Secure Message")'),
+    ).toBeVisible();
+    expect(bundle.manifestFetches).toBe(0);
+
+    await page.click('button:has-text("Reveal Secure Message")');
+    await expect(page.locator('h2:has-text("File Bundle")')).toBeVisible();
+    expect(bundle.manifestFetches).toBe(1);
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.click('button:has-text("Download All as Zip")');
+    const download = await downloadPromise;
+    const path = await download.path();
+    expect(download.suggestedFilename()).toBe('yopass-bundle.zip');
+    expect(path).toBeTruthy();
+
+    const zip = await JSZip.loadAsync(await fs.readFile(path as string));
+    const firstFile = zip.file('first.txt');
+    const secondFile = zip.file('second.txt');
+    expect(firstFile).toBeTruthy();
+    expect(secondFile).toBeTruthy();
+    await expect(firstFile!.async('string')).resolves.toBe('First bundle file');
+    await expect(secondFile!.async('string')).resolves.toBe(
+      'Second bundle file',
+    );
   });
 
   test('should verify complete upload and download flow', async ({ page }) => {

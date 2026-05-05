@@ -14,6 +14,10 @@ export interface MockFileResponse {
   expiration?: number;
 }
 
+export interface MockBundleResponse {
+  message: string;
+}
+
 export class MockAPI {
   private capturedRequests: Array<{
     url: string;
@@ -95,6 +99,41 @@ export class MockAPI {
             filename: reqHeaders['x-yopass-filename'] || '',
             contentType: reqHeaders['content-type'] || '',
           },
+        });
+      }
+
+      await route.fulfill({
+        status,
+        headers,
+        json: response,
+      });
+    });
+  }
+
+  async mockCreateBundle(response: MockBundleResponse, status: number = 200) {
+    await this.page.route('**/create/bundle', async route => {
+      const headers = {
+        'content-type': 'application/json',
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'POST, OPTIONS',
+        'access-control-allow-headers': 'Content-Type',
+      };
+
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({
+          status: 200,
+          headers,
+          body: '',
+        });
+        return;
+      }
+
+      if (route.request().method() === 'POST') {
+        const payload = JSON.parse(route.request().postData() || '{}');
+        this.capturedRequests.push({
+          url: route.request().url(),
+          method: route.request().method(),
+          payload,
         });
       }
 

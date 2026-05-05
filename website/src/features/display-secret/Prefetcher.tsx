@@ -1,4 +1,4 @@
-import { backendDomain } from '@shared/lib/api';
+import { backendDomain, type StatusResponse } from '@shared/lib/api';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ErrorPage from './ErrorPage';
@@ -19,7 +19,8 @@ export default function Prefetcher() {
     PREFETCH_SECRET ? false : true,
   );
 
-  const statusBaseUrl = `${backendDomain}/${isFile ? 'file' : 'secret'}/${key}`;
+  const secretType = isBundle ? 'bundle' : isFile ? 'file' : 'secret';
+  const statusBaseUrl = `${backendDomain}/${secretType}/${key}`;
   const secretUrl = `${backendDomain}/secret/${key}`;
   const oneTime = useAsync(async () => {
     if (!(PREFETCH_SECRET && !fetchSecret)) {
@@ -33,26 +34,23 @@ export default function Prefetcher() {
     if (!request.ok) {
       throw new Error('Failed to check status');
     }
-    const json = (await request.json()) as { oneTime: boolean };
+    const json = (await request.json()) as StatusResponse;
     return json.oneTime;
   }, [PREFETCH_SECRET, fetchSecret, statusBaseUrl]);
 
-  // Auto-fetch for non one-time secrets
   useEffect(() => {
     if (PREFETCH_SECRET && !fetchSecret && oneTime.value === false) {
       setFetchSecret(true);
     }
   }, [PREFETCH_SECRET, fetchSecret, oneTime.value]);
 
-  // secret fetcher (guarded against duplicate calls under React StrictMode)
-  // Only used for text secrets — files are handled by StreamingDecryptor
   const hasFetchedRef = useRef(false);
   const [secretValue, setSecretValue] = useState<string | undefined>(undefined);
   const [secretLoading, setSecretLoading] = useState(false);
   const [secretError, setSecretError] = useState<Error | null>(null);
 
   useEffect(() => {
-    if (isFile || !fetchSecret) {
+    if (isFile || isBundle || !fetchSecret) {
       return;
     }
     if (hasFetchedRef.current) {
@@ -78,21 +76,15 @@ export default function Prefetcher() {
         setSecretLoading(false);
       }
     })();
-  }, [isFile, fetchSecret, secretUrl]);
+  }, [isFile, isBundle, fetchSecret, secretUrl]);
 
-  // Bundles have their own component with independent fetching/decryption
-  if (isBundle && key) {
-    return <BundleDownload bundleKey={key} />;
-  }
-
-  // Surface errors before showing the loading placeholder
   if (oneTime.error || secretError) {
     return <ErrorPage />;
   }
   const loadingPrefetch = PREFETCH_SECRET ? oneTime.loading : false;
   if (
     loadingPrefetch ||
-    (!isFile && (secretLoading || (fetchSecret && !secretValue)))
+    (!isFile && !isBundle && (secretLoading || (fetchSecret && !secretValue)))
   ) {
     return <div>{t('display.loading')}</div>;
   }
@@ -180,7 +172,10 @@ export default function Prefetcher() {
     );
   }
 
-  // File downloads use streaming decryption
+  if (isBundle && key) {
+    return <BundleDownload bundleKey={key} />;
+  }
+
   if (isFile && key) {
     return <StreamingDecryptor secretKey={key} />;
   }

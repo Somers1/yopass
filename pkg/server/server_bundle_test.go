@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -192,13 +193,27 @@ func TestGetBundleNotFound(t *testing.T) {
 	}
 }
 
+func doStreamUploadOneTime(t *testing.T, handler http.Handler) string {
+	t.Helper()
+	req := streamUploadRequest(pgpBody("encrypted-test-data"), "3600", "true", "test.bin")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("upload failed: %d %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid response JSON: %v", err)
+	}
+	return resp["message"]
+}
+
 func TestGetBundleOneTime(t *testing.T) {
 	db := newTestDB()
 	srv := newBundleTestServer(t, db)
 	handler := srv.HTTPHandler()
 
-	// Upload file and create one-time bundle
-	key1 := doStreamUpload(t, handler)
+	key1 := doStreamUploadOneTime(t, handler)
 
 	body := `{"file_keys":["` + key1 + `"],"filenames":["a.txt"],"sizes":[100],"expiration":3600,"one_time":true}`
 	req := httptest.NewRequest("POST", "/create/bundle", strings.NewReader(body))
@@ -212,7 +227,6 @@ func TestGetBundleOneTime(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &createResp)
 	bundleKey := createResp["message"]
 
-	// First GET should work
 	req = httptest.NewRequest("GET", "/bundle/"+bundleKey, nil)
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -220,7 +234,6 @@ func TestGetBundleOneTime(t *testing.T) {
 		t.Fatalf("first get failed: %d", w.Code)
 	}
 
-	// Second GET should return 404 (one-time bundle was deleted)
 	req = httptest.NewRequest("GET", "/bundle/"+bundleKey, nil)
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -228,12 +241,65 @@ func TestGetBundleOneTime(t *testing.T) {
 		t.Fatalf("expected 404 on second get, got %d", w.Code)
 	}
 
-	// The referenced file should also be deleted
+	req = httptest.NewRequest("GET", "/file/"+key1, nil)
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200 for referenced file after manifest fetch, got %d", w.Code)
+	}
+
 	req = httptest.NewRequest("GET", "/file/"+key1, nil)
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	if w.Code != 404 {
-		t.Fatalf("expected 404 for deleted file, got %d", w.Code)
+		t.Fatalf("expected 404 after one-time file download, got %d", w.Code)
+	}
+}
+
+func TestGetBundleStatus(t *testing.T) {
+	db := newTestDB()
+	srv := newBundleTestServer(t, db)
+	handler := srv.HTTPHandler()
+
+	key1 := doStreamUpload(t, handler)
+	body := `{"file_keys":["` + key1 + `"],"filenames":["a.txt"],"sizes":[100],"expiration":3600,"one_time":true}`
+	req := httptest.NewRequest("POST", "/create/bundle", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("create bundle failed: %d", w.Code)
+	}
+
+	var createResp map[string]string
+	json.Unmarshal(w.Body.Bytes(), &createResp)
+	req = httptest.NewRequest("GET", "/bundle/"+createResp["message"]+"/status", nil)
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]bool
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if resp["oneTime"] != true {
+		t.Errorf("expected oneTime=true, got %v", resp["oneTime"])
+	}
+}
+
+func TestGetBundleStatusNotFound(t *testing.T) {
+	db := newTestDB()
+	srv := newBundleTestServer(t, db)
+	handler := srv.HTTPHandler()
+
+	req := httptest.NewRequest("GET", "/bundle/00000000-0000-0000-0000-000000000000/status", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != 404 {
+		t.Fatalf("expected 404, got %d", w.Code)
 	}
 }
 
