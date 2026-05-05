@@ -49,7 +49,7 @@ func (y *Server) createBundle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, fk := range req.FileKeys {
-		if _, err := y.DB.Get(streamKeyPrefix + fk); err != nil {
+		if _, err := y.DB.Status(streamKeyPrefix + fk); err != nil {
 			y.Logger.Debug("Bundle references non-existent file", zap.String("key", fk), zap.Error(err))
 			http.Error(w, `{"message": "Referenced file not found: `+fk+`"}`, http.StatusBadRequest)
 			return
